@@ -10,6 +10,8 @@ RememberMe scans your local git repos, samples real code you've written, and syn
 
 It captures things a style guide never does: the fact that you use `const` everywhere but reach for `as any` when it's convenient, that you store money as `_cents` integers, that you write flat `useState` chains instead of `useReducer`, that your Python scripts log with emojis and `"=" * 70` banners.
 
+It also captures **how you think** — via a short interactive interview (`remember-me interview`) that asks about your approach to abstraction, errors, comments, testing, and refactoring. Your answers are injected verbatim at the top of the profile, so Claude reads them before it reads any extracted pattern.
+
 ## How it works
 
 ```
@@ -58,6 +60,20 @@ remember-me init --root ~/projects
 
 Scans every git repo under `~/projects`, extracts style rules, writes the profile to `~/.claude/RememberMe.MD`, and links it into `~/.claude/CLAUDE.md` so Claude Code picks it up automatically.
 
+### Capture *how you think* (optional but recommended)
+
+```sh
+remember-me interview
+```
+
+Asks ~15 questions — abstraction threshold, error handling, comment philosophy, testing approach, refactoring timing, etc. Hit Enter to skip any. Writes `~/.claude/remember-me/philosophy.md`, which gets injected verbatim at the top of your profile on the next `init` / `refresh` / `rebuild`.
+
+You can also hand-write the file and point at it:
+
+```sh
+remember-me rebuild --philosophy ~/my-philosophy.md
+```
+
 ### Keep it fresh on every commit
 
 ```sh
@@ -72,9 +88,10 @@ Installs a global git `post-commit` hook. Each commit silently refreshes the pro
 
 | Command | What it does |
 |---|---|
-| `remember-me status` | Show cached repos, LOC per language, profile + hook state |
+| `remember-me status` | Show cached repos, LOC per language, profile + hook + philosophy state |
 | `remember-me refresh --repo PATH` | Re-scan a single repo and rebuild the profile |
 | `remember-me rebuild` | Re-synthesize the profile from cache (no rescanning) |
+| `remember-me interview` | Run the questionnaire to capture how you think |
 | `remember-me show` | Print the current `RememberMe.MD` to stdout |
 | `remember-me clear` | Delete all cached repo data |
 
@@ -83,6 +100,7 @@ Installs a global git `post-commit` hook. Each commit silently refreshes the pro
 - `--model haiku` — use a faster/cheaper Claude model for extraction (default: system default)
 - `--samples-per-repo N` — how many files per language per repo to sample (default: 3)
 - `--force` — ignore cache and rescan
+- `--philosophy PATH` — point at a custom philosophy markdown file (default: `~/.claude/remember-me/philosophy.md`)
 
 ## What lands in `~/.claude/`
 
@@ -93,6 +111,7 @@ Installs a global git `post-commit` hook. Each commit silently refreshes the pro
 ├── RememberMe.MD       # the generated style profile (binding rules)
 └── remember-me/
     ├── cache/          # per-repo scan results (JSON)
+    ├── philosophy.md   # your answers to `remember-me interview` (if you ran it)
     └── hooks/          # post-commit hook (if installed)
 ```
 

@@ -34,11 +34,18 @@ Rules for your output:
 Return ONLY the markdown content — start with `## Meta-Style`. No preamble."""
 
 
-def render(per_language: dict[str, dict], python_ast: dict | None = None, model: str | None = None) -> str:
+def render(
+    per_language: dict[str, dict],
+    python_ast: dict | None = None,
+    model: str | None = None,
+    philosophy: str | None = None,
+) -> str:
     header = f"# RememberMe Style Profile\n_Auto-generated — last refresh: {date.today().isoformat()}_\n\n"
+    # Philosophy is user-authored; prepend verbatim, never feed to Claude synthesis.
+    philosophy_block = (philosophy.strip() + "\n\n") if philosophy and philosophy.strip() else ""
 
     if not per_language:
-        return header + "_No code found to analyze yet._\n"
+        return header + philosophy_block + "_No code found to analyze yet._\n"
 
     rules_parts = []
     template_parts = []
@@ -67,4 +74,4 @@ def render(per_language: dict[str, dict], python_ast: dict | None = None, model:
             f"### {lang}\n" + "\n".join(d["top_rules"]) for lang, d in per_language.items()
         )
 
-    return header + _DIRECTIVE + body + "\n"
+    return header + _DIRECTIVE + philosophy_block + body + "\n"

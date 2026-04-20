@@ -3,7 +3,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import aggregator, cache, claude_cli, distributor, extractor, git_hook, metrics, repo_meta
+from . import aggregator, cache, claude_cli, distributor, extractor, git_hook, interview, metrics, repo_meta
 from .discovery import discover_repos
 from .renderer import render
 from .scanner import count_loc, pick_samples, scan_files
@@ -35,7 +35,7 @@ def _scan_repo(repo: Path, samples_per_repo: int, model: str | None) -> dict:
     return entry
 
 
-def _rebuild_profile(model: str | None) -> int:
+def _rebuild_profile(model: str | None, philosophy_path: Path | None = None) -> int:
     cache.prune_missing()
     entries = cache.load_all()
     if not entries:
@@ -58,8 +58,13 @@ def _rebuild_profile(model: str | None) -> int:
     python_file_metrics = aggregator.flatten_python_ast_metrics(entries)
     python_ast = metrics.aggregate(python_file_metrics) if python_file_metrics else None
 
+    philosophy = interview.load(philosophy_path)
+    if philosophy:
+        src = philosophy_path or interview.DEFAULT_PATH
+        print(f"including philosophy from {src}")
+
     print(f"synthesizing profile across {len(per_language)} language(s)...")
-    content = render(per_language, python_ast=python_ast, model=model)
+    content = render(per_language, python_ast=python_ast, model=model, philosophy=philosophy)
 
     path = distributor.write_profile(content)
     linked = distributor.link_into_claude_md()
@@ -94,7 +99,7 @@ def _cmd_init(args: argparse.Namespace) -> int:
         entry = _scan_repo(repo, args.samples_per_repo, args.model)
         cache.save(repo, entry)
 
-    return _rebuild_profile(args.model)
+    return _rebuild_profile(args.model, _philosophy_path(args))
 
 
 def _cmd_refresh(args: argparse.Namespace) -> int:
@@ -117,7 +122,7 @@ def _cmd_refresh(args: argparse.Namespace) -> int:
     print(f"{repo.name}: scanning")
     entry = _scan_repo(repo, args.samples_per_repo, args.model)
     cache.save(repo, entry)
-    return _rebuild_profile(args.model)
+    return _rebuild_profile(args.model, _philosophy_path(args))
 
 
 def _cmd_install_hook(args: argparse.Namespace) -> int:
@@ -132,7 +137,19 @@ def _cmd_rebuild(args: argparse.Namespace) -> int:
     except claude_cli.ClaudeUnavailable as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
-    return _rebuild_profile(args.model)
+    return _rebuild_profile(args.model, _philosophy_path(args))
+
+
+def _cmd_interview(args: argparse.Namespace) -> int:
+    target = Path(args.output).expanduser().resolve() if args.output else None
+    interview.run(output=target)
+    return 0
+
+
+def _philosophy_path(args: argparse.Namespace) -> Path | None:
+    """Resolve --philosophy flag if provided; else None (defaults to DEFAULT_PATH)."""
+    raw = getattr(args, "philosophy", None)
+    return Path(raw).expanduser().resolve() if raw else None
 
 
 def _cmd_clear(_args: argparse.Namespace) -> int:
@@ -162,6 +179,8 @@ def _cmd_status(_args: argparse.Namespace) -> int:
     current = git_hook._get_current_hooks_path()
     hook_state = "installed" if current == str(git_hook.HOOKS_DIR) else f"not installed (core.hooksPath={current or 'unset'})"
     print(f"git hook: {hook_state}")
+    phil_state = "found" if interview.DEFAULT_PATH.exists() else "missing (run `remember-me interview`)"
+    print(f"philosophy: {interview.DEFAULT_PATH} ({phil_state})")
     return 0
 
 
@@ -174,6 +193,7 @@ def main() -> int:
     init.add_argument("--samples-per-repo", type=int, default=3)
     init.add_argument("--model", default=None, help="claude model override (e.g. haiku)")
     init.add_argument("--force", action="store_true", help="ignore cache, rescan every repo")
+    init.add_argument("--philosophy", default=None, help="path to philosophy markdown (default: ~/.claude/remember-me/philosophy.md if it exists)")
     init.set_defaults(func=_cmd_init)
 
     refresh = sub.add_parser("refresh", help="re-scan a single repo and rebuild the profile")
@@ -181,6 +201,7 @@ def main() -> int:
     refresh.add_argument("--samples-per-repo", type=int, default=3)
     refresh.add_argument("--model", default=None)
     refresh.add_argument("--force", action="store_true")
+    refresh.add_argument("--philosophy", default=None)
     refresh.set_defaults(func=_cmd_refresh)
 
     hook = sub.add_parser("install-hook", help="install global git post-commit hook for auto-refresh")
@@ -192,7 +213,12 @@ def main() -> int:
 
     rebuild = sub.add_parser("rebuild", help="re-synthesize the profile from cache (no rescanning)")
     rebuild.add_argument("--model", default=None)
+    rebuild.add_argument("--philosophy", default=None)
     rebuild.set_defaults(func=_cmd_rebuild)
+
+    interview_cmd = sub.add_parser("interview", help="answer questions about how you think — captured into philosophy.md and injected into the profile")
+    interview_cmd.add_argument("--output", default=None, help=f"where to write the file (default: {interview.DEFAULT_PATH})")
+    interview_cmd.set_defaults(func=_cmd_interview)
 
     clear = sub.add_parser("clear", help="delete all cached repo + file data")
     clear.set_defaults(func=_cmd_clear)
