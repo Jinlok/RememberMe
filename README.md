@@ -1,6 +1,6 @@
 # RememberMe
 
-[![CI](https://github.com/chrisrapp/RememberMe/actions/workflows/ci.yml/badge.svg)](https://github.com/chrisrapp/RememberMe/actions/workflows/ci.yml)
+[![CI](https://github.com/Jinlok/RememberMe/actions/workflows/ci.yml/badge.svg)](https://github.com/Jinlok/RememberMe/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python: 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
 
@@ -37,7 +37,7 @@ Results are cached per repo and refreshed incrementally based on the latest comm
 ## Install
 
 ```sh
-git clone https://github.com/chrisrapp/RememberMe.git
+git clone https://github.com/Jinlok/RememberMe.git
 cd RememberMe
 pip install -e .
 ```
